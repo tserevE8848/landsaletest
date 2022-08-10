@@ -8,6 +8,7 @@
 pragma solidity ^0.8.8;
 import "hardhat/console.sol";
 // OpenZeppelin Contracts v4.4.1 (utils/introspection/IERC165.sol)
+// OpenZeppelin Contracts v4.4.1 (utils/introspection/IERC165.sol)
 
 /**
  * @dev Interface of the ERC165 standard, as defined in the
@@ -1279,7 +1280,7 @@ library MerkleProof {
 }
 // YetiLand Star Here
 //
-contract YetiLands is ERC721, Ownable, ReentrancyGuard {
+contract YetiLand is ERC721, Ownable, ReentrancyGuard {
     using Strings for uint;
     using Counters for Counters.Counter;
 
@@ -1292,13 +1293,10 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
     bytes32 public holderMerkleRoot;
     bytes32 public claimableMerkleRoot;
     string public _provenance;
-    bool public revealed;
     bool public isClaimLandActive;
     bool public isPublicSaleActive;
     bool public isHolderSaleActive;
-    string public notRevealedURI;
-    string public baseURI;
-    string public baseExtension;
+    string private baseURI;
     // this will change based on snapshot taken
     uint public maxClaimLandSupply = 2496;
 
@@ -1309,9 +1307,7 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
     mapping(address => uint8) public claimLandAllowance;
     mapping(address => uint) public tokensMintedByAddress;
     Counters.Counter private _tokenId;
-    constructor() ERC721("TestYetiLand", "TEYLAND") {
-        console.log("contract created");
-    }
+    constructor() ERC721("YetiLand", "YLAND") {}
 
     function totalSupply() public view returns(uint) {
         return _tokenId.current() + _reserveTokenId - maxClaimLandSupply;
@@ -1321,7 +1317,7 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
         require(_mintAmount > 0, "You must mint at least 1 NFT");
         require(sale.maxTokensPerTransaction >= _mintAmount, "Mint per transaction exceeded");
         require(tokensMintedByAddress[msg.sender] + _mintAmount <= sale.maxTokensPerAddress, "Max tokens minted for this address");
-        require(_reserveTokenId + _mintAmount <= (maxSupply - maxClaimLandSupply), "Max supply exceeded");
+        require(_reserveTokenId + _mintAmount <= maxSupply, "Max supply exceeded");
         require(msg.value >= sale.price * _mintAmount, "Please send the correct amount of ETH");
         for (uint i = 0; i < _mintAmount; i++) {
             _safeMint(msg.sender, _reserveTokenId);
@@ -1335,7 +1331,7 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
         require(sale.maxTokensPerTransaction >= _mintAmount, "Mint per transaction exceeded");
         require(isSYHolder(msg.sender, merkleProof), "Please use correct Holder address");
         require(tokensMintedByAddress[msg.sender] + _mintAmount <= sale.maxTokensPerAddress, "Max tokens minted for this address");
-        require(_reserveTokenId + _mintAmount <= (maxSupply - maxClaimLandSupply), "Max supply exceeded");
+        require(_reserveTokenId + _mintAmount <= maxSupply, "Max supply exceeded");
         require(msg.value >= sale.holderPrice * _mintAmount, "Please send the correct amount of ETH");
         for (uint i = 0; i < _mintAmount; i++) {
             _safeMint(msg.sender, _reserveTokenId);
@@ -1369,13 +1365,11 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
         alreadyClaimed[msg.sender]=_claimAmount;
     }
     function isSYHolder(address claimer, bytes32[] memory _merkleProof) public view returns (bool){
-        console.log(claimer);
         bytes32 leaf = keccak256(abi.encodePacked(claimer));
         return MerkleProof.verify(_merkleProof, holderMerkleRoot, leaf);
     }
     function setHolderList(bytes32 _merkleRoot) public onlyOwner {
         holderMerkleRoot = _merkleRoot;
-        console.log("holder list");
     }
     function isClaimable(uint _claimAmount, address _claimer, bytes32[] memory _merkleProof) public view returns (bool){
         bytes32 leaf = keccak256(abi.encodePacked(_claimer, _claimAmount));
@@ -1383,30 +1377,13 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
     }
     function setClaimableList(bytes32 _merkleRoot) public onlyOwner {
         claimableMerkleRoot = _merkleRoot;
-        console.log("claimable list");
     }
-    function tokenURI(uint tokenId) public view virtual override returns (string memory) {
-        require(_exists(tokenId), "ERC721Metadata: URI query for nonexistent token");
-        if(!revealed) {
-            return notRevealedURI;
-        }
-        return bytes(baseURI).length > 0
-        ? string(abi.encodePacked(baseURI, tokenId.toString(), baseExtension)): "";
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
     }
-
-    function setRevealed(bool _revealed) public onlyOwner() {
-        revealed = _revealed;
+    function setBaseURI(string memory uri) public onlyOwner {
+        baseURI = uri;
     }
-
-    function setNotRevealedURI(string memory _notRevealedURI) public onlyOwner {
-        notRevealedURI = _notRevealedURI;
-    }
-
-    function setBaseURI(string memory _baseURI, string memory _baseExtension) public onlyOwner {
-        baseURI = _baseURI;
-        baseExtension = _baseExtension;
-    }
-
     function setSaleDetails(
         uint _maxTokensPerAddress,
         uint _maxTokensPerTransaction,
@@ -1417,7 +1394,6 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
         sale.maxTokensPerTransaction = _maxTokensPerTransaction;
         sale.price = _price;
         sale.holderPrice = _holderPrice;
-        console.log("set sale details");
     }
     function setProvenanceHash(string memory provenanceHash) public onlyOwner {
         _provenance = provenanceHash;
@@ -1425,6 +1401,11 @@ contract YetiLands is ERC721, Ownable, ReentrancyGuard {
     function setMaxClaimLandSupply(uint _maxClaimLandSupply) public onlyOwner {
         maxClaimLandSupply = _maxClaimLandSupply;
     }
+    // if need incase when the max claim supply changes
+    function setReserveTokenId(uint changereserveTokenId) public onlyOwner {
+        _reserveTokenId = changereserveTokenId;
+    }
+
     function setClaimLandActive(bool _state) public onlyOwner {
         isClaimLandActive = _state;
     }
